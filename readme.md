@@ -48,8 +48,15 @@ In milliseconds; defaults to zero.
 Grace period for worker shutdown.
 Once each worker is sent SIGTERM, the grace period starts.
 Any workers still alive when it ends are killed.
+Parent exits after killing workers.
 
 In milliseconds; defaults to 5000.
+
+### messenger
+
+Handler for message passing to master.
+Listener created for every worker when forked.
+Cluster property `isMaster` (Boolean) and `workers` (object) exposed as properties on `throng`.
 
 ## Example
 
@@ -63,6 +70,38 @@ throng(start, {
   lifetime: Infinity,
   grace: 4000
 });
+```
+
+Or using message passing:
+
+```js
+var throng = require('throng');
+
+if ( throng.isMaster ) {
+  
+  function handleMsg(msg) {
+    console.log('Received from worker: '+msg.txt);
+    throng.workers[msg.from].send({txt: 'Get back to work'});
+  }
+
+}
+
+throng(start, { workers: 3, messenger: handleMsg });
+
+function start(workerID) {
+  console.log('Started worker');
+
+  process.on('message', function(msg) {
+    console.log('Received from master: '+msg.txt);
+  });
+
+  process.on('SIGTERM', function() {
+    console.log('Worker exiting');
+    process.exit();
+  });
+
+  process.send({txt: 'Hi parent',from: workerID});
+}
 ```
 
 ## Tests
